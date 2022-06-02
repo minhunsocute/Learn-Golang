@@ -2,8 +2,22 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
+
+// stuct
+type DataOfUser struct {
+	firstName string
+	lastName  string
+	email     string
+}
+
+//list of maps
+var listUsers = make([]map[string]string, 0)
+
+//list of struct
+var listUsers1 = make([]DataOfUser, 0)
 
 func main() {
 	name1 := "MinHung"
@@ -90,8 +104,55 @@ func main() {
 	a := float32(0)
 	b := float32(0)
 	c := float32(0)
-	a, b, c = returnManyValues(float32(10), float32(2))
+	//a, b, c = helper.returnManyValues(float32(10), float32(2))
 	fmt.Printf("%f %f %f", a, b, c)
+
+	//Maps syntax
+	// var a = map[keytype]valueType{key1: value1, key2: value2 , key3: value3}
+	// b := map[keytype]valueType{key1: value1, key2: value2 , key3: value3}
+	// c:= make(map[keyType]valueType)
+	// Call map
+	// a[keytype]
+	var userData = make(map[string]string)
+
+	userData["firstname"] = "Nguyen"
+	userData["lastName"] = "Hung"
+	userData["email"] = "hungnguyen.201102ak@gmail.com"
+
+	fmt.Println(userData["firstname"])
+
+	//list of maps
+	var count int = 0
+	//var listUsers = make([]map[string]string, 0)
+	for {
+		if count > 2 {
+			break
+		} else if count == 1 {
+			go pintGo()
+		}
+		var first_name, last_name, email = getUserInput(count)
+		var user_data = make(map[string]string)
+		user_data["firstName"] = first_name
+		user_data["lastName"] = last_name
+		user_data["Email"] = email
+
+		listUsers = append(listUsers, user_data)
+		count++
+	}
+	printListUserOfMap()
+	count = 0
+	for {
+		if count > 2 {
+			break
+		}
+		var first_name, last_name, email = getUserInput(count)
+		var userOfData = DataOfUser{firstName: first_name,
+			lastName: last_name,
+			email:    email}
+		listUsers1 = append(listUsers1, userOfData)
+		count++
+	}
+	printListUserOfStruct()
 }
 
 // Functions
@@ -116,3 +177,57 @@ func printFirstName(booking []string) []string {
 }
 
 // Functions return many values
+
+// func returnManyValues(a float32, b float32) (float32, float32, float32) {
+// 	return (a + b), (a - b), (a / b)
+// }
+
+func getUserInput(count int) (string, string, string) {
+	var firstName string
+	var lastName string
+	var email string
+
+	fmt.Println("Enter your first name of " + strconv.Itoa(count) + ": ")
+	fmt.Scan(&firstName)
+
+	fmt.Println("Enter your last nameof " + strconv.Itoa(count) + ": ")
+	fmt.Scan(&lastName)
+
+	fmt.Println("Enter your email addressof " + strconv.Itoa(count) + ": ")
+	fmt.Scan(&email)
+
+	for {
+		if strings.Contains(email, "@") {
+			break
+		} else {
+			fmt.Println("Enter again email because don't have @ in emain:")
+			fmt.Scan(&email)
+		}
+	}
+	return firstName, lastName, email
+}
+
+func printListUserOfMap() {
+	for _, value := range listUsers {
+		fmt.Println(value["firstName"])
+		fmt.Println(value["lastName"])
+		fmt.Println(value["Email"])
+		fmt.Println("-------------------")
+	}
+}
+
+func printListUserOfStruct() {
+	for _, value := range listUsers1 {
+		fmt.Println(value.firstName)
+		fmt.Println(value.lastName)
+		fmt.Println(value.email)
+		fmt.Println("-------------------")
+
+	}
+}
+
+// sẽ được gọi sau khi gọi hàm go
+
+func pintGo() {
+	fmt.Print(0)
+}
