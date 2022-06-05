@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/mail"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -37,6 +39,7 @@ func CreatePersonEndpoint(w http.ResponseWriter, r *http.Request) {
 func GetPeopleEndPoint(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Functions get is called")
 	w.Header().Set("Content-Type", "application/json")
+	listUser = nil
 	collection := client.Database("mydb").Collection("user")
 	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
 	cursor, err := collection.Find(ctx, bson.M{})
@@ -89,6 +92,105 @@ func GetPersonFromDatabaseEndPoint(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(person)
 }
+
+func SignInEndPoint(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Functions is called")
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+	listUser = nil
+	collection := client.Database("mydb").Collection("user")
+	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+	cursor, err := collection.Find(ctx, bson.M{})
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"message": "` + err.Error() + `"}`))
+		return
+	}
+	defer cursor.Close(ctx)
+	for cursor.Next(ctx) {
+		var person Person
+		cursor.Decode(&person)
+		listUser = append(listUser, person)
+	}
+	if err := cursor.Err(); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"message": "` + err.Error() + `"}`))
+		return
+	}
+	if listUser != nil {
+		for _, item := range listUser {
+			if item.Email == params["email"] && item.Password == params["password"] {
+				json.NewEncoder(w).Encode(item)
+				return
+			}
+		}
+	} else {
+		json.NewEncoder(w).Encode("Don't have account")
+		return
+	}
+	json.NewEncoder(w).Encode("Doo't have account")
+}
+
+func valid(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
+}
+
+func createIdUser(collection *mongo.Collection, ctx context.Context, email string) string {
+	cursor, err := collection.Find(ctx, bson.M{})
+	var people []Person
+	if err != nil {
+		return "user 1"
+	}
+	defer cursor.Close(ctx)
+	for cursor.Next(ctx) {
+		var person Person
+		cursor.Decode(&person)
+		people = append(people, person)
+		if person.Email == email {
+			return "error"
+		}
+	}
+	if err := cursor.Err(); err != nil {
+		return "user 1"
+	}
+	result := "user " + strconv.Itoa(len(people)+1)
+	return result
+}
+
+func SignUpUserEndPoint(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Create user is called")
+	w.Header().Set("Content-Type", "application/json")
+	var person Person
+	params := mux.Vars(r)
+	collection := client.Database("mydb").Collection("user")
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	if params["email"] != "" && params["password"] != "" && params["name"] != "" && params["age"] != "" {
+		if !valid(params["email"]) || len(params["password"]) < 7 {
+			json.NewEncoder(w).Encode("Email or password is not format")
+			return
+
+		} else {
+			person.Email = params["email"]
+			person.Name = params["name"]
+			person.Password = params["password"]
+			i, _ := strconv.Atoi(params["age"])
+			person.Age = i
+			person.Id = createIdUser(collection, ctx, person.Email)
+			if person.Id == "error" {
+				json.NewEncoder(w).Encode("User already exists")
+				return
+			}
+		}
+	} else {
+		json.NewEncoder(w).Encode("Field is not null")
+		return
+	}
+	result, _ := collection.InsertOne(ctx, person)
+	json.NewEncoder(w).Encode(result)
+}
+
 func main() {
 	fmt.Println("Starting the application.....")
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
@@ -100,6 +202,7 @@ func main() {
 	router.HandleFunc("/createuser", CreatePersonEndpoint).Methods("POST")
 	router.HandleFunc("/getAll", GetPeopleEndPoint).Methods("GET")
 	router.HandleFunc("/find/{id}", GetPersonFromDatabaseEndPoint).Methods("GET")
-
+	router.HandleFunc("/api/user/signIn/{email}/{password}", SignInEndPoint).Methods("GET")
+	router.HandleFunc("/api/user/signUp/{email}/{password}/{name}/{age}", SignUpUserEndPoint).Methods("POST")
 	http.ListenAndServe(":2011", router)
 }
