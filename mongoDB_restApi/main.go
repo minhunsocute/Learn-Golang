@@ -38,7 +38,7 @@ func CreatePersonEndpoint(w http.ResponseWriter, r *http.Request) {
 }
 func GetPeopleEndPoint(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Functions get is called")
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-T ype", "application/json")
 	listUser = nil
 	collection := client.Database("mydb").Collection("user")
 	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
@@ -62,6 +62,28 @@ func GetPeopleEndPoint(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(listUser)
 }
 
+func GetAllUser() []Person {
+	var result []Person = nil
+	collection := client.Database("mydb").Collection("user")
+	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+	cursor, err := collection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil
+	}
+	defer cursor.Close(ctx)
+	for cursor.Next(ctx) {
+		var person Person
+		cursor.Decode(&person)
+		result = append(result, person)
+	}
+	if err := cursor.Err(); err != nil {
+		return nil
+	}
+	return result
+}
+func GetPeopleEndPoint1(w http.ResponseWriter, r *http.Request) {
+
+}
 func GetPersonEndPoint(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Find user is called")
 	w.Header().Set("Content-Type", "application/json")
@@ -159,6 +181,33 @@ func createIdUser(collection *mongo.Collection, ctx context.Context, email strin
 	return result
 }
 
+func checkFound(listUser []Person, email string) bool {
+	for _, item := range listUser {
+		if item.Email == email {
+			return false
+		}
+	}
+	return true
+}
+
+func DeleteUserEndPoint(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("DeleteUser function is called")
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+	//collection := client.Database("mydb").Collection("user")
+	//	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	var listUser []Person = GetAllUser()
+	if params["email"] != "" {
+		if !checkFound(listUser, params["email"]) {
+
+		} else {
+			json.NewEncoder(w).Encode("Error email not found")
+		}
+	} else {
+		json.NewEncoder(w).Encode("Error email is null")
+		return
+	}
+}
 func SignUpUserEndPoint(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Create user is called")
 	w.Header().Set("Content-Type", "application/json")
@@ -199,10 +248,12 @@ func main() {
 	router := mux.NewRouter()
 
 	//Handle Function
-	router.HandleFunc("/createuser", CreatePersonEndpoint).Methods("POST")
-	router.HandleFunc("/getAll", GetPeopleEndPoint).Methods("GET")
+	router.HandleFunc("/user/createuser", CreatePersonEndpoint).Methods("POST")
+	router.HandleFunc("/user/getAll", GetPeopleEndPoint).Methods("GET")
 	router.HandleFunc("/find/{id}", GetPersonFromDatabaseEndPoint).Methods("GET")
-	router.HandleFunc("/api/user/signIn/{email}/{password}", SignInEndPoint).Methods("GET")
-	router.HandleFunc("/api/user/signUp/{email}/{password}/{name}/{age}", SignUpUserEndPoint).Methods("POST")
+	router.HandleFunc("/user/signIn/{email}/{password}", SignInEndPoint).Methods("GET")
+	router.HandleFunc("/user/signUp/{email}/{password}/{name}/{age}", SignUpUserEndPoint).Methods("POST")
+	router.HandleFunc("/api/user/deleteUser/{email}", DeleteUserEndPoint).Methods("DELETE")
+
 	http.ListenAndServe(":2011", router)
 }
