@@ -190,24 +190,49 @@ func checkFound(listUser []Person, email string) bool {
 	return true
 }
 
+func remove(list []Person, email string) []Person {
+	var result []Person = nil
+	for _, item := range list {
+		if item.Email != email {
+			result = append(result, item)
+		}
+	}
+	return result
+}
+
 func DeleteUserEndPoint(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("DeleteUser function is called")
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
-	//collection := client.Database("mydb").Collection("user")
-	//	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	collection := client.Database("mydb").Collection("user")
+	//ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	var listUser []Person = GetAllUser()
 	if params["email"] != "" {
 		if !checkFound(listUser, params["email"]) {
-
+			deleteResult, _ := collection.DeleteOne(context.TODO(), bson.M{"email": params["email"]})
+			if deleteResult.DeletedCount == 0 {
+				json.NewEncoder(w).Encode("Error cannot delete User")
+				return
+			}
+			listUser = remove(listUser, params["email"])
+			json.NewEncoder(w).Encode(listUser)
+			return
 		} else {
 			json.NewEncoder(w).Encode("Error email not found")
+			return
 		}
 	} else {
 		json.NewEncoder(w).Encode("Error email is null")
 		return
 	}
 }
+
+func EditUserEndPoint(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("EditUser function is called")
+	w.Header().Set("Content-Type", "application/json")
+
+}
+
 func SignUpUserEndPoint(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Create user is called")
 	w.Header().Set("Content-Type", "application/json")
@@ -240,6 +265,38 @@ func SignUpUserEndPoint(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+func postUserEndPoint(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Post user is called")
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+	collection := client.Database("mydb").Collection("users")
+	var person Person
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	if params["email"] != "" && params["password"] != "" && params["name"] != "" && params["age"] != "" {
+		if !valid(params["email"]) || len(params["password"]) < 7 {
+			json.NewEncoder(w).Encode("Error . Email is not format")
+			return
+		} else {
+			person.Email = params["email"]
+			person.Name = params["name"]
+			person.Password = params["password"]
+			i, _ := strconv.Atoi(params["age"])
+			person.Age = i
+			person.Id = createIdUser(collection, ctx, person.Email)
+			if person.Id == "error" {
+				json.NewEncoder(w).Encode("Error . User is already")
+				return
+			}
+
+		}
+	} else {
+		json.NewEncoder(w).Encode("Email . Field is not null")
+		return
+	}
+	result, _ := collection.InsertOne(ctx, person)
+	json.NewEncoder(w).Encode(result)
+	return
+}
 func main() {
 	fmt.Println("Starting the application.....")
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
@@ -253,7 +310,8 @@ func main() {
 	router.HandleFunc("/find/{id}", GetPersonFromDatabaseEndPoint).Methods("GET")
 	router.HandleFunc("/user/signIn/{email}/{password}", SignInEndPoint).Methods("GET")
 	router.HandleFunc("/user/signUp/{email}/{password}/{name}/{age}", SignUpUserEndPoint).Methods("POST")
-	router.HandleFunc("/api/user/deleteUser/{email}", DeleteUserEndPoint).Methods("DELETE")
+	router.HandleFunc("/user/deleteUser/{email}", DeleteUserEndPoint).Methods("DELETE")
+	router.HandleFunc("/user/postUser/{email}/{password}/{name}/{age}", postUserEndPoint).Methods("POST")
 
 	http.ListenAndServe(":2011", router)
 }
