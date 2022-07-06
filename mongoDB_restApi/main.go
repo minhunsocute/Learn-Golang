@@ -297,6 +297,43 @@ func postUserEndPoint(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 	return
 }
+func editUserEndPoint(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Edit user is called")
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+	collection := client.Database("mydb").Collection("user")
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	if params["email"] != "" && params["password"] != "" && params["name"] != "" && params["age"] != "" {
+		if !valid(params["email"]) || len("password") < 7 {
+			json.NewEncoder(w).Encode("Error . Email is not Format")
+			return
+		} else {
+			var person Person
+			err := collection.FindOne(ctx, Person{Id: params["email"]}).Decode(&person)
+			if err != nil {
+				json.NewEncoder(w).Encode("Error . User is not found")
+				return
+			}
+			result, err := collection.ReplaceOne(ctx, bson.M{"email": params["email"]}, bson.M{
+				"password": params["password"],
+				"name":     params["name"],
+				"age":      params["age"],
+			})
+
+			if err != nil {
+				json.NewEncoder(w).Encode("Error . Edit user is fail")
+				return
+			}
+			json.NewEncoder(w).Encode(result)
+			return
+		}
+	} else {
+		json.NewEncoder(w).Encode("Error . Field is null")
+		return
+	}
+	return
+}
+
 func main() {
 	fmt.Println("Starting the application.....")
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
@@ -311,7 +348,6 @@ func main() {
 	router.HandleFunc("/user/signIn/{email}/{password}", SignInEndPoint).Methods("GET")
 	router.HandleFunc("/user/signUp/{email}/{password}/{name}/{age}", SignUpUserEndPoint).Methods("POST")
 	router.HandleFunc("/user/deleteUser/{email}", DeleteUserEndPoint).Methods("DELETE")
-	router.HandleFunc("/user/postUser/{email}/{password}/{name}/{age}", postUserEndPoint).Methods("POST")
-
+	router.HandleFunc("/user/editUser/{email}/{password}/{name}/{age}", editUserEndPoint).Methods("PATH")
 	http.ListenAndServe(":2011", router)
 }
