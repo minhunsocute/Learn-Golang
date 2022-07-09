@@ -1,14 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/mail"
 	"strconv"
 	"time"
-
+	"strings"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -21,6 +21,15 @@ type Person struct {
 	Password string `json:"password"`
 	Age      int    `json: "age"`
 	Id       string `json:"id"`
+}
+
+type User struct{
+	Id 			 string `json:"id"`
+	Name 		 string `json:name`
+	Email 		 string `json:email`
+	Password 	 string `json:password`
+	Avatar 		 string `json:avatar`
+	PhoneNumber  string `json:phoneNumber`
 }
 
 var client *mongo.Client
@@ -302,22 +311,27 @@ func editUserEndPoint(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	params := mux.Vars(r)
 	collection := client.Database("mydb").Collection("user")
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
 	if params["email"] != "" && params["password"] != "" && params["name"] != "" && params["age"] != "" {
 		if !valid(params["email"]) || len("password") < 7 {
 			json.NewEncoder(w).Encode("Error . Email is not Format")
 			return
 		} else {
-			var person Person
-			err := collection.FindOne(ctx, Person{Id: params["email"]}).Decode(&person)
-			if err != nil {
-				json.NewEncoder(w).Encode("Error . User is not found")
-				return
-			}
+			//var person Person
+			// err := collection.FindOne(ctx, Person{Email: params["email"]}).Decode(&person)
+			// fmt.Println(params["email"])
+			// fmt.Println(person.Email)
+			// fmt.Println(err)
+			// if err != nil {
+			// 	json.NewEncoder(w).Encode("Error . User is not found")
+			// 	return
+			// }
 			result, err := collection.ReplaceOne(ctx, bson.M{"email": params["email"]}, bson.M{
-				"password": params["password"],
 				"name":     params["name"],
+				"email":    params["email"],
+				"password": params["password"],
 				"age":      params["age"],
+				"id":       params["id"],
 			})
 
 			if err != nil {
@@ -333,6 +347,100 @@ func editUserEndPoint(w http.ResponseWriter, r *http.Request) {
 	}
 	return
 }
+//-------------------------------------------Mountain trip api
+
+func get_allUser() []User{
+	var result []User = nil
+	collection := client.Database("mountain_trip").Collection("Users")
+	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+	cursor, err := collection.Find(ctx, bson.M{})
+	if err != nil {
+		return nil
+	}
+	defer cursor.Close(ctx)
+	for cursor.Next(ctx) {
+		var person User
+		cursor.Decode(&person)
+		result = append(result, person)
+	}
+	if err := cursor.Err(); err != nil {
+		return nil
+	}
+	return result
+}
+
+var list_user []User
+
+func SignInUser_EndPoint(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Sign In User func is called")
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+	if params["email"] != "" && params["password"] != ""{
+		if !valid(params["email"]) || len(params["password"]) < 7{
+			json.NewEncoder(w).Encode("Error")
+			return
+		}else{
+			list_user = get_allUser()
+			for _,item := range list_user{
+				fmt.Println(item.Email + " " + item.Password)
+				if item.Email == params["email"] && item.Password == params["password"]{
+					json.NewEncoder(w).Encode(item)
+					return 
+				}
+			}
+			json.NewEncoder(w).Encode("Error")
+			return		
+		}
+	}else{
+		json.NewEncoder(w).Encode("Error")
+		return
+	}
+}
+
+func SignUpUser_EndPoint(w http.ResponseWriter, r *http.Request){
+	fmt.Println("Sign Up User func in called")
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+	collection := client.Database("mountain_trip").Collection("Users")
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+
+	if params["email"] != "" && params["password"] != ""{
+		if !valid(params["email"]) || len(params["password"]) < 7{
+			json.NewEncoder(w).Encode("Error")
+			return
+		}else{
+			list_user = nil
+			list_user = get_allUser()
+			for _, item := range list_user{
+				if item.Email == params["email"]{
+					json.NewEncoder(w).Encode("Error User already exists")
+					return
+				}
+			}
+			var user User 
+			index := strings.Index(params["email"], "@")
+			name := params["email"][0:index]
+			
+			id := "User " + strconv.Itoa(len(list_user))
+
+			user.Id = id
+			user.Name = name
+			user.Email = params["email"]
+			user.Password = params["password"]
+			user.PhoneNumber = ""
+			user.Avatar = params["avatar"]
+
+			result, _ := collection.InsertOne(ctx, user)
+			fmt.Println(result)
+			json.NewEncoder(w).Encode(user)
+			return
+
+		}
+	}else{
+		json.NewEncoder(w).Encode("Error")
+		return
+	}
+}
 
 func main() {
 	fmt.Println("Starting the application.....")
@@ -345,9 +453,11 @@ func main() {
 	router.HandleFunc("/user/createuser", CreatePersonEndpoint).Methods("POST")
 	router.HandleFunc("/user/getAll", GetPeopleEndPoint).Methods("GET")
 	router.HandleFunc("/find/{id}", GetPersonFromDatabaseEndPoint).Methods("GET")
-	router.HandleFunc("/user/signIn/{email}/{password}", SignInEndPoint).Methods("GET")
-	router.HandleFunc("/user/signUp/{email}/{password}/{name}/{age}", SignUpUserEndPoint).Methods("POST")
+	//router.HandleFunc("/user/signIn/{email}/{password}", SignInEndPoint).Methods("GET")
+	//router.HandleFunc("/user/signUp/{email}/{password}/{name}/{age}", SignUpUserEndPoint).Methods("POST")
 	router.HandleFunc("/user/deleteUser/{email}", DeleteUserEndPoint).Methods("DELETE")
-	router.HandleFunc("/user/editUser/{email}/{password}/{name}/{age}", editUserEndPoint).Methods("PATH")
+	router.HandleFunc("/user/editUser/{email}/{password}/{name}/{age}/{id}", editUserEndPoint).Methods("PATCH")
+	router.HandleFunc("/user/signIn/{email}/{password}", SignInUser_EndPoint).Methods("GET")
+	router.HandleFunc("/user/signUp/{email}/{password}/{avatar}", SignUpUser_EndPoint).Methods("POST")
 	http.ListenAndServe(":2011", router)
 }
