@@ -442,6 +442,41 @@ func SignUpUser_EndPoint(w http.ResponseWriter, r *http.Request){
 	}
 }
 
+func EditUser_EndPoint(w http.ResponseWriter, r *http.Request){
+	fmt.Println("Edit Func is called")
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+	collection := client.Database("mountain_trip").Collection("Users")
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+
+	if params["name"] != "" && params["password"] != "" && params["phone"] != ""{
+		if !valid(params["email"]) || len(params["password"]) < 7{
+			json.NewEncoder(w).Encode("Error Email or password is invalid")
+			return
+		}else{
+			var user User
+			filter := bson.D{{"id", params["id"]}}
+			err := collection.FindOne(ctx,filter ).Decode(&user)
+			if err != nil{
+				json.NewEncoder(w).Encode("Error User is not found")
+				return
+			}
+			update := bson.D{{"$set", bson.D{{"name", params["name"]}}}}
+			result,err := collection.UpdateOne(context.TODO(),filter,update)
+			// err = collection.Update(bson.M{"_id": user.ID},bson.M{"$set": bson.M{"name": params["name"]}})
+			if err != nil{
+				json.NewEncoder(w).Encode("Error Can not update Profile User")
+				return
+			}
+			json.NewEncoder(w).Encode(result)
+			return
+		} 
+	}else{
+		json.NewEncoder(w).Encode("Error Input is null")
+		return
+	}
+}
+
 func main() {
 	fmt.Println("Starting the application.....")
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
@@ -459,5 +494,6 @@ func main() {
 	router.HandleFunc("/user/editUser/{email}/{password}/{name}/{age}/{id}", editUserEndPoint).Methods("PATCH")
 	router.HandleFunc("/user/signIn/{email}/{password}", SignInUser_EndPoint).Methods("GET")
 	router.HandleFunc("/user/signUp/{email}/{password}/{avatar}", SignUpUser_EndPoint).Methods("POST")
+	router.HandleFunc("/user/edit/{id}/{name}/{email}/{password}/{avatar}/{phone}", EditUser_EndPoint).Methods("PATCH")
 	http.ListenAndServe(":2011", router)
 }
