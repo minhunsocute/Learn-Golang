@@ -461,7 +461,9 @@ func EditUser_EndPoint(w http.ResponseWriter, r *http.Request){
 				json.NewEncoder(w).Encode("Error User is not found")
 				return
 			}
-			update := bson.D{{"$set", bson.D{{"name", params["name"]}}}}
+			update := bson.D{{"$set", bson.D{{"name", params["name"]},
+											 {"email", params["email"]},
+											 {"phoneNumber", params["phone"]},}}}
 			result,err := collection.UpdateOne(context.TODO(),filter,update)
 			// err = collection.Update(bson.M{"_id": user.ID},bson.M{"$set": bson.M{"name": params["name"]}})
 			if err != nil{
@@ -477,6 +479,38 @@ func EditUser_EndPoint(w http.ResponseWriter, r *http.Request){
 	}
 }
 
+func ChangePassword_EndPoint(w http.ResponseWriter, r *http.Request){
+	fmt.Println("Change Password func is called")
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+	collection := client.Database("mountain_trip").Collection("Users")
+	ctx,_:= context.WithTimeout(context.Background(),5 * time.Second)
+	if len(params["newPass"]) >= 7 {
+		filter := bson.D{{"id", params["id"]}}
+		var user User
+		err := collection.FindOne(ctx, filter).Decode(&user)
+
+		fmt.Println(user.Password + " - " + params["yourPass"])
+
+		if user.Password != params["yourPass"]{
+			json.NewEncoder(w).Encode("Error Your Password is invalid")
+			return
+		}
+
+		update := bson.D{{"$set", bson.D{{"password", params["newPass"]}}}}
+		result, err := collection.UpdateOne(context.TODO(), filter , update)
+
+		if err != nil{
+			json.NewEncoder(w).Encode("Error Cann't Change your password")
+			return
+		}
+		json.NewEncoder(w).Encode(result)
+		return
+	}else{
+		json.NewEncoder(w).Encode("Error Password must be more than 7 characters")
+		return
+	}
+}
 func main() {
 	fmt.Println("Starting the application.....")
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
@@ -492,8 +526,13 @@ func main() {
 	//router.HandleFunc("/user/signUp/{email}/{password}/{name}/{age}", SignUpUserEndPoint).Methods("POST")
 	router.HandleFunc("/user/deleteUser/{email}", DeleteUserEndPoint).Methods("DELETE")
 	router.HandleFunc("/user/editUser/{email}/{password}/{name}/{age}/{id}", editUserEndPoint).Methods("PATCH")
+
+	// Handle User model
 	router.HandleFunc("/user/signIn/{email}/{password}", SignInUser_EndPoint).Methods("GET")
 	router.HandleFunc("/user/signUp/{email}/{password}/{avatar}", SignUpUser_EndPoint).Methods("POST")
 	router.HandleFunc("/user/edit/{id}/{name}/{email}/{password}/{avatar}/{phone}", EditUser_EndPoint).Methods("PATCH")
+	router.HandleFunc("/user/changePass/{id}/{newPass}/{yourPass}", ChangePassword_EndPoint).Methods("PATCH")
+
+	
 	http.ListenAndServe(":2011", router)
 }
