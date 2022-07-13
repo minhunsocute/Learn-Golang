@@ -379,7 +379,7 @@ func SignInUser_EndPoint(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	if params["email"] != "" && params["password"] != "" {
 		if !valid(params["email"]) || len(params["password"]) < 7 {
-			json.NewEncoder(w).Encode("Error")
+			json.NewEncoder(w).Encode("Error Email or pasword is not format")
 			return
 		} else {
 			list_user = get_allUser()
@@ -390,11 +390,11 @@ func SignInUser_EndPoint(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			}
-			json.NewEncoder(w).Encode("Error")
+			json.NewEncoder(w).Encode("Error User is not found")
 			return
 		}
 	} else {
-		json.NewEncoder(w).Encode("Error")
+		json.NewEncoder(w).Encode("Error Email,Password is not null")
 		return
 	}
 }
@@ -430,7 +430,7 @@ func SignUpUser_EndPoint(w http.ResponseWriter, r *http.Request) {
 			user.Email = params["email"]
 			user.Password = params["password"]
 			user.PhoneNumber = params["phone"]
-			user.Avatar = params["avatar"]
+			user.Avatar = "null"
 
 			result, _ := collection.InsertOne(ctx, user)
 			fmt.Println(result)
@@ -439,7 +439,7 @@ func SignUpUser_EndPoint(w http.ResponseWriter, r *http.Request) {
 
 		}
 	} else {
-		json.NewEncoder(w).Encode("Error")
+		json.NewEncoder(w).Encode("Error Field is not null")
 		return
 	}
 }
@@ -473,10 +473,42 @@ func EditUser_EndPoint(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			json.NewEncoder(w).Encode(result)
+
 			return
 		}
 	} else {
 		json.NewEncoder(w).Encode("Error Input is null")
+		return
+	}
+}
+
+func Reset_EndPoint(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Forgot passwordd func is called")
+	w.Header().Set("Content-Type", "application/json")
+	params := mux.Vars(r)
+	collection := client.Database("mountain_trip").Collection("Users")
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+
+	if len(params["newPass"]) >= 7 {
+		filter := bson.D{{"email", params["email"]}}
+		update := bson.D{{"$set", bson.D{{"password", params["newpass"]}}}}
+		_, err := collection.UpdateOne(context.TODO(), filter, update)
+
+		if err != nil {
+			json.NewEncoder(w).Encode("Error Cann't Change your password")
+			return
+		}
+
+		var user User
+		err = collection.FindOne(ctx, filter).Decode(&user)
+		if err != nil {
+			json.NewEncoder(w).Encode("Error user is not found")
+			return
+		}
+		json.NewEncoder(w).Encode(user)
+		return
+	} else {
+		json.NewEncoder(w).Encode("Error Password must be more than 7 characters")
 		return
 	}
 }
