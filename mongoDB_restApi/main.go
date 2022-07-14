@@ -491,7 +491,7 @@ func Reset_EndPoint(w http.ResponseWriter, r *http.Request) {
 
 	if len(params["newPass"]) >= 7 {
 		filter := bson.D{{"email", params["email"]}}
-		update := bson.D{{"$set", bson.D{{"password", params["newpass"]}}}}
+		update := bson.D{{"$set", bson.D{{"password", params["newPass"]}}}}
 		_, err := collection.UpdateOne(context.TODO(), filter, update)
 
 		if err != nil {
@@ -566,7 +566,7 @@ func main() {
 	router.HandleFunc("/user/signUp/{email}/{password}/{phone}", SignUpUser_EndPoint).Methods("POST")
 	router.HandleFunc("/user/edit/{id}/{name}/{email}/{password}/{avatar}/{phone}", EditUser_EndPoint).Methods("PATCH")
 	router.HandleFunc("/user/changePass/{id}/{newPass}/{yourPass}", ChangePassword_EndPoint).Methods("PATCH")
-
+	router.HandleFunc("/user/resetPass/{email}/{newPass}", Reset_EndPoint).Methods("PATCH")
 	// Hanedle place Model
 
 	http.ListenAndServe(":2011", router)
